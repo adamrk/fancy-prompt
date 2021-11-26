@@ -33,20 +33,16 @@ impl Prompt {
                 .map(String::as_ref)
                 .unwrap_or_else(|| "???");
 
-        let max_vcs_len = 20; // "g*+?:mybr...nch:+1-1"
-        let vcs = self.format_vcs();
-        let vcs = vcs.map(|vcs| compress_vcs(&vcs, max_vcs_len));
-
         let battery_len = 10;
         let cols = self.data.terminal_cols.unwrap_or(80);
 
         // " (~/a/...cde|g*+?:mybr:+1-1) -- {--<=======} doy@lance [19:40:50] "
-        let mut max_path_len = cols
+        let mut max_path_and_vcs_len = cols
             - 1                               // " "
-            - vcs
-                .as_ref()
-                .map(|vcs| vcs.len() + 1)     // "|g*+?:mybr:+1-1"
-                .unwrap_or(0) - 2             // "()"
+            // - vcs
+            //     .as_ref()
+            //     .map(|vcs| vcs.len() + 1)     // "|g*+?:mybr:+1-1"
+            //     .unwrap_or(0) - 2             // "()"
             - 1                               // " "
             - 1                               // "-"
             - 1                               // " "
@@ -55,19 +51,28 @@ impl Prompt {
             - 10                              // "[19:40:50]"
             - 1;                              // " "
         if self.data.power_info.has_batteries() {
-            max_path_len -= battery_len + 2   // "{<=========}"
+            max_path_and_vcs_len -= battery_len + 2   // "{<=========}"
                 + 1;                          // " "
         }
 
-        if max_path_len < 10 {                // "~/a/...cde"
+        if max_path_and_vcs_len < 14 {                // "~/a/...cde|g:b1"
             panic!(
                 "terminal too small (need at least {} cols)",
-                cols + 10 - max_path_len
+                cols + 10 - max_path_and_vcs_len
             );
         }
 
-        let path =
-            compress_path(&self.data.pwd, &self.data.home, max_path_len);
+        let path = make_path(&self.data.pwd, &self.data.home);
+        let vcs = self.format_vcs();
+
+        let (max_path_len, max_vcs_len) = partition_remaining_length(
+            path.as_ref().map(|s| s.len()).unwrap_or(3),
+            vcs.as_ref().map(|s|s.len()).unwrap_or(3),
+            max_path_and_vcs_len - 1);
+
+        let path = compress_path(path, max_path_len);
+
+        let vcs = vcs.map(|vcs| compress_vcs(&vcs, max_vcs_len));
 
         self.colors.pad(&mut t, 1);
         self.display_path(
@@ -367,11 +372,10 @@ fn vcs_color(vcs_info: Option<& dyn vcs::VcsInfo>) -> String {
         .unwrap_or_else(|| String::from("vcs_error"))
 }
 
-fn compress_path<T, U>(
+fn make_path<T, U>(
     path: &Option<T>,
     home: &Option<U>,
-    len: usize,
-) -> String
+) -> Option<String> 
 where
     T: AsRef<std::path::Path>,
     U: AsRef<std::path::Path>,
@@ -387,7 +391,18 @@ where
 
             path_str = home_re.replace(&path_str, "~").into_owned();
         }
+        Some(path_str)
+    } else {
+        None
+    }
+}
 
+fn compress_path(
+    path_str: Option<String>,
+    len: usize,
+) -> String
+{
+    if let Some(mut path_str) = path_str {
         let path_compress_re = regex::Regex::new(r"/([^/])[^/]+/").unwrap();
 
         while path_str.len() > len {
@@ -405,8 +420,7 @@ where
         }
 
         path_str
-    }
-    else {
+    } else {
         String::from("???")
     }
 }
@@ -452,6 +466,33 @@ fn active_operation_id(op: vcs::ActiveOperation) -> String {
         vcs::ActiveOperation::CherryPick => String::from("c"),
         vcs::ActiveOperation::Bisect => String::from("b"),
         vcs::ActiveOperation::Rebase => String::from("r"),
+    }
+}
+
+fn partition_remaining_length(
+    length1: usize, 
+    length2: usize, 
+    remaining_length: usize,
+) -> (usize, usize) {
+    if remaining_length >= length1 + length2 {
+        return (length1, length2);
+    }
+
+    let to_reduce = length1 + length2 - remaining_length;
+    if length1 > length2 {
+        if length1 - length2 > to_reduce {
+            (length1 - to_reduce, length2)
+        } else {
+            let both = length2 - (to_reduce - (length1 - length2) + 1) / 2;
+            (both, both)
+        }
+    } else {
+        if length2 - length1 > to_reduce {
+            (length1, length2 - to_reduce)
+        } else {
+            let both = length1 - (to_reduce - (length2 - length1) + 1) / 2;
+            (both, both)
+        }
     }
 }
 
@@ -522,7 +563,8 @@ mod test {
                 "~/c/...mpt",
             ];
             for (i, &expected) in expecteds.iter().enumerate() {
-                assert_eq!(compress_path(path, home, 25 - i), expected);
+                let path = make_path(path, home);
+                assert_eq!(compress_path(path, 25 - i), expected);
             }
         }
     }
@@ -746,5 +788,47 @@ mod test {
             );
             assert_eq!(vcs_color(Some(&test_vcs)), String::from("vcs_dirty"));
         }
+    }
+
+    #[test]
+    fn test_partition_remaining_length1() {
+        assert_eq!(partition_remaining_length(10, 10, 10), (5, 5));
+        
+    }
+
+    #[test]
+    fn test_partition_remaining_length2() {
+        assert_eq!(partition_remaining_length(10, 10, 9), (4, 4));
+        
+    }
+
+    #[test]
+    fn test_partition_remaining_length3() {
+        assert_eq!(partition_remaining_length(11, 10, 9), (4, 4));
+        
+    }
+
+    #[test]
+    fn test_partition_remaining_length4() {
+        assert_eq!(partition_remaining_length(10, 11, 9), (4, 4));
+        
+    }
+
+    #[test]
+    fn test_partition_remaining_length5() {
+        assert_eq!(partition_remaining_length(20, 10, 25), (15, 10));
+        
+    }
+
+    #[test]
+    fn test_partition_remaining_length6() {
+        assert_eq!(partition_remaining_length(30, 70, 80), (30, 50));
+        
+    }
+
+    #[test]
+    fn test_partition_remaining_length7() {
+        assert_eq!(partition_remaining_length(30, 70, 100), (30, 70));
+        
     }
 }
