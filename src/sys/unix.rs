@@ -1,6 +1,3 @@
-use users;
-use std;
-
 use std::os::unix::fs::MetadataExt;
 use std::os::unix::fs::PermissionsExt;
 

@@ -1,13 +1,5 @@
-extern crate chrono;
 #[macro_use]
 extern crate clap;
-extern crate git2;
-extern crate hostname;
-extern crate regex;
-extern crate term;
-extern crate term_size;
-extern crate users;
-extern crate walkdir;
 
 #[macro_use]
 mod verbose;
