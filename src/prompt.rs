@@ -90,7 +90,13 @@ impl Prompt {
         );
 
         self.colors.pad(&mut t, 1);
-        self.display_border(&mut t, max_path_len - path.len() + 1);
+        self.display_border(
+            &mut t,
+            max_path_and_vcs_len
+                - path.len()
+                - vcs.as_ref().map(|s| s.len()).unwrap_or(0)
+                - 2,
+        );
         self.colors.pad(&mut t, 1);
 
         if self.data.power_info.has_batteries() {
