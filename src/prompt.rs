@@ -22,16 +22,18 @@ impl Prompt {
     pub fn display<W: std::io::Write>(&self, w: W) {
         let mut t = term::TerminfoTerminal::new(w).unwrap();
 
-        let user =
-            self.data.user
-                .as_ref()
-                .map(String::as_ref)
-                .unwrap_or_else(|| "???");
-        let host =
-            self.data.hostname
-                .as_ref()
-                .map(String::as_ref)
-                .unwrap_or_else(|| "???");
+        let user = self
+            .data
+            .user
+            .as_ref()
+            .map(String::as_ref)
+            .unwrap_or_else(|| "???");
+        let host = self
+            .data
+            .hostname
+            .as_ref()
+            .map(String::as_ref)
+            .unwrap_or_else(|| "???");
 
         let battery_len = 10;
         let cols = self.data.terminal_cols.unwrap_or(80);
@@ -49,13 +51,14 @@ impl Prompt {
             - user.len() - 1 - host.len()     // "doy@lance"
             - 1                               // " "
             - 10                              // "[19:40:50]"
-            - 1;                              // " "
+            - 1; // " "
         if self.data.power_info.has_batteries() {
             max_path_and_vcs_len -= battery_len + 2   // "{<=========}"
-                + 1;                          // " "
+                + 1; // " "
         }
 
-        if max_path_and_vcs_len < 14 {                // "~/a/...cde|g:b1"
+        if max_path_and_vcs_len < 14 {
+            // "~/a/...cde|g:b1"
             panic!(
                 "terminal too small (need at least {} cols)",
                 cols + 10 - max_path_and_vcs_len
@@ -67,8 +70,9 @@ impl Prompt {
 
         let (max_path_len, max_vcs_len) = partition_remaining_length(
             path.as_ref().map(|s| s.len()).unwrap_or(3),
-            vcs.as_ref().map(|s|s.len()).unwrap_or(3),
-            max_path_and_vcs_len - 1);
+            vcs.as_ref().map(|s| s.len()).unwrap_or(3),
+            max_path_and_vcs_len - 1,
+        );
 
         let path = compress_path(path, max_path_len);
 
@@ -114,7 +118,7 @@ impl Prompt {
 
     fn display_path<W: std::io::Write>(
         &self,
-        t: &mut dyn term::Terminal<Output=W>,
+        t: &mut dyn term::Terminal<Output = W>,
         path: &str,
         path_color: &str,
         vcs: Option<&str>,
@@ -131,16 +135,16 @@ impl Prompt {
 
     fn display_border<W: std::io::Write>(
         &self,
-        t: &mut dyn term::Terminal<Output=W>,
-        len: usize
+        t: &mut dyn term::Terminal<Output = W>,
+        len: usize,
     ) {
         self.colors.print(t, "default", &"-".repeat(len));
     }
 
     fn display_battery<W: std::io::Write>(
         &self,
-        t: &mut dyn term::Terminal<Output=W>,
-        len: usize
+        t: &mut dyn term::Terminal<Output = W>,
+        len: usize,
     ) {
         self.print_host(t, "{");
         if let Some(battery_usage) = self.data.power_info.battery_usage() {
@@ -160,8 +164,11 @@ impl Prompt {
                 }
             }
             if filled > 1 {
-                self.colors
-                    .print(t, "battery_charging", &"=".repeat(filled - 1));
+                self.colors.print(
+                    t,
+                    "battery_charging",
+                    &"=".repeat(filled - 1),
+                );
             }
         }
         else {
@@ -172,7 +179,7 @@ impl Prompt {
 
     fn display_identity<W: std::io::Write>(
         &self,
-        t: &mut dyn term::Terminal<Output=W>,
+        t: &mut dyn term::Terminal<Output = W>,
         user: &str,
         host: &str,
     ) {
@@ -183,7 +190,7 @@ impl Prompt {
 
     fn display_time<W: std::io::Write>(
         &self,
-        t: &mut dyn term::Terminal<Output=W>,
+        t: &mut dyn term::Terminal<Output = W>,
     ) {
         self.print_host(t, "[");
         self.colors.print(
@@ -196,7 +203,7 @@ impl Prompt {
 
     fn display_error_code<W: std::io::Write>(
         &self,
-        t: &mut dyn term::Terminal<Output=W>,
+        t: &mut dyn term::Terminal<Output = W>,
     ) {
         let error_code_color = if self.data.error_code == 0 {
             "default"
@@ -207,13 +214,13 @@ impl Prompt {
         self.colors.print(
             t,
             error_code_color,
-            &format!("{:03}", self.data.error_code)
+            &format!("{:03}", self.data.error_code),
         );
     }
 
     fn display_prompt<W: std::io::Write>(
         &self,
-        t: &mut dyn term::Terminal<Output=W>,
+        t: &mut dyn term::Terminal<Output = W>,
     ) {
         let prompt = if self.data.is_root {
             "#"
@@ -234,16 +241,16 @@ impl Prompt {
 
     fn print_host<W: std::io::Write>(
         &self,
-        t: &mut dyn term::Terminal<Output=W>,
-        text: &str
+        t: &mut dyn term::Terminal<Output = W>,
+        text: &str,
     ) {
         self.colors.print_host(t, self.hostname(), text);
     }
 
     fn print_user<W: std::io::Write>(
         &self,
-        t: &mut dyn term::Terminal<Output=W>,
-        text: &str
+        t: &mut dyn term::Terminal<Output = W>,
+        text: &str,
     ) {
         self.colors.print_user(t, self.user(), text);
     }
@@ -280,20 +287,17 @@ fn battery_discharge_color(usage: f64, charging: bool) -> &'static str {
 
 fn path_color(path: Option<&std::path::Path>) -> String {
     path.as_ref()
-        .map(|path| {
-            match sys::path_writable(path) {
-                sys::PathWritability::Writable
-                    => String::from("default"),
-                sys::PathWritability::NotWritable
-                    => String::from("path_not_writable"),
-                sys::PathWritability::NotExist
-                    => String::from("path_not_exist"),
+        .map(|path| match sys::path_writable(path) {
+            sys::PathWritability::Writable => String::from("default"),
+            sys::PathWritability::NotWritable => {
+                String::from("path_not_writable")
             }
+            sys::PathWritability::NotExist => String::from("path_not_exist"),
         })
         .unwrap_or_else(|| String::from("path_not_exist"))
 }
 
-fn format_vcs(vcs_info: Option<& dyn vcs::VcsInfo>) -> Option<String> {
+fn format_vcs(vcs_info: Option<&dyn vcs::VcsInfo>) -> Option<String> {
     vcs_info.as_ref().map(|vcs_info| {
         let mut vcs = String::new();
 
@@ -355,7 +359,7 @@ fn format_vcs(vcs_info: Option<& dyn vcs::VcsInfo>) -> Option<String> {
     })
 }
 
-fn vcs_color(vcs_info: Option<& dyn vcs::VcsInfo>) -> String {
+fn vcs_color(vcs_info: Option<&dyn vcs::VcsInfo>) -> String {
     vcs_info
         .as_ref()
         .map(|vcs_info| {
@@ -372,10 +376,7 @@ fn vcs_color(vcs_info: Option<& dyn vcs::VcsInfo>) -> String {
         .unwrap_or_else(|| String::from("vcs_error"))
 }
 
-fn make_path<T, U>(
-    path: &Option<T>,
-    home: &Option<U>,
-) -> Option<String> 
+fn make_path<T, U>(path: &Option<T>, home: &Option<U>) -> Option<String>
 where
     T: AsRef<std::path::Path>,
     U: AsRef<std::path::Path>,
@@ -387,21 +388,19 @@ where
             let home_str = home.as_ref().to_string_lossy().into_owned();
             let home_re = regex::Regex::new(
                 &(String::from(r"^") + &regex::escape(&home_str)),
-            ).unwrap();
+            )
+            .unwrap();
 
             path_str = home_re.replace(&path_str, "~").into_owned();
         }
         Some(path_str)
-    } else {
+    }
+    else {
         None
     }
 }
 
-fn compress_path(
-    path_str: Option<String>,
-    len: usize,
-) -> String
-{
+fn compress_path(path_str: Option<String>, len: usize) -> String {
     if let Some(mut path_str) = path_str {
         let path_compress_re = regex::Regex::new(r"/([^/])[^/]+/").unwrap();
 
@@ -415,12 +414,14 @@ fn compress_path(
         }
 
         if path_str.len() > len {
-            path_str = String::from(&path_str[..len - 6]) + "..."
+            path_str = String::from(&path_str[..len - 6])
+                + "..."
                 + &path_str[path_str.len() - 3..]
         }
 
         path_str
-    } else {
+    }
+    else {
         String::from("???")
     }
 }
@@ -432,17 +433,20 @@ fn compress_vcs(vcs: &str, len: usize) -> String {
         vcs_parts_re
             .captures(vcs)
             .map(|cap| {
-                let prefix_len = cap.get(1)
+                let prefix_len = cap
+                    .get(1)
                     .map(|mat| mat.end() - mat.start() + 1)
                     .unwrap_or(0);
-                let suffix_len = cap.get(2)
+                let suffix_len = cap
+                    .get(2)
                     .map(|mat| mat.end() - mat.start() + 1)
                     .unwrap_or(0);
                 let branch_len = len - prefix_len - suffix_len;
                 let branch_re = regex::Regex::new(&format!(
                     r"(:[^:]{{{}}})[^:]*([^:]{{3}}:?)",
                     (branch_len - 6).to_string()
-                )).unwrap();
+                ))
+                .unwrap();
                 branch_re.replace(vcs, "$1...$2").into_owned()
             })
             .unwrap_or_else(|| vcs.to_string())
@@ -470,8 +474,8 @@ fn active_operation_id(op: vcs::ActiveOperation) -> String {
 }
 
 fn partition_remaining_length(
-    length1: usize, 
-    length2: usize, 
+    length1: usize,
+    length2: usize,
     remaining_length: usize,
 ) -> (usize, usize) {
     if remaining_length >= length1 + length2 {
@@ -482,14 +486,17 @@ fn partition_remaining_length(
     if length1 > length2 {
         if length1 - length2 > to_reduce {
             (length1 - to_reduce, length2)
-        } else {
+        }
+        else {
             let both = length2 - (to_reduce - (length1 - length2) + 1) / 2;
             (both, both)
         }
-    } else {
+    }
+    else {
         if length2 - length1 > to_reduce {
             (length1, length2 - to_reduce)
-        } else {
+        }
+        else {
             let both = length1 - (to_reduce - (length2 - length1) + 1) / 2;
             (both, both)
         }
@@ -793,42 +800,35 @@ mod test {
     #[test]
     fn test_partition_remaining_length1() {
         assert_eq!(partition_remaining_length(10, 10, 10), (5, 5));
-        
     }
 
     #[test]
     fn test_partition_remaining_length2() {
         assert_eq!(partition_remaining_length(10, 10, 9), (4, 4));
-        
     }
 
     #[test]
     fn test_partition_remaining_length3() {
         assert_eq!(partition_remaining_length(11, 10, 9), (4, 4));
-        
     }
 
     #[test]
     fn test_partition_remaining_length4() {
         assert_eq!(partition_remaining_length(10, 11, 9), (4, 4));
-        
     }
 
     #[test]
     fn test_partition_remaining_length5() {
         assert_eq!(partition_remaining_length(20, 10, 25), (15, 10));
-        
     }
 
     #[test]
     fn test_partition_remaining_length6() {
         assert_eq!(partition_remaining_length(30, 70, 80), (30, 50));
-        
     }
 
     #[test]
     fn test_partition_remaining_length7() {
         assert_eq!(partition_remaining_length(30, 70, 100), (30, 70));
-        
     }
 }
